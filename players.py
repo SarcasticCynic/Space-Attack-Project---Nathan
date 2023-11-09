@@ -1,7 +1,7 @@
 import pygame
 
 class Player():
-    def __init__ (self, screen,):
+    def __init__ (self, screen):
         self.screen=screen
         self.X_change = 0
         self.X = 370

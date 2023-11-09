@@ -64,7 +64,13 @@ def isCollision(enemyX, enemyY, bulletX, bulletY):
 running = True
 FPS = 100
 pygameClock = pygame.time.Clock()
-bullet = bullets.Bullet(screen)
+projectiles = [bullets.Bullet(screen),\
+               bullets.Bullet(screen),\
+               bullets.Bullet(screen),\
+               bullets.Bullet(screen),\
+               bullets.Bullet(screen)]
+num_of_bullets = 5
+
 while running:
     pygameClock.tick(FPS)
     
@@ -91,9 +97,13 @@ while running:
             if event.key == pygame.K_RIGHT:
                 player.move_right()
             if event.key == pygame.K_SPACE:
-                if bullet.state is bullets.BulletState.READY:
-                    # Get the current x cordinate of the spaceship
-                    bullet.fire(player.X)
+                for k in range(num_of_bullets):
+                    if projectiles[k].state is bullets.BulletState.READY:
+                        for l in range(num_of_bullets):
+                            if projectiles[l].state == bullets.BulletState.READY:
+                                projectiles[l].state = bullets.BulletState.COOLDOWN
+                                projectiles[l].cooldown_track += 10
+                        projectiles[k].fire(player.X)
             if event.key == pygame.K_ESCAPE:
                 running = False
 
@@ -115,28 +125,29 @@ while running:
         active_enemies[i].update()
         
         # Collision
-        if isCollision(active_enemies[i].X, active_enemies[i].Y, bullet.X, bullet.Y):
-            explosionSound = pygame.mixer.Sound("explosion.wav")
-            explosionSound.play()
-            bullet.reset()
-            score_value += 1
-            # Had to put the value in enemies.Enemy so that buff_spd() could reset it, 
-            # but had to reference it here in order to increment it per collision.
-            enemies.Enemy.spd_death_count += 1
-            # Same here
-            enemies.Enemy.rein_death_count += 1
-            destroyed_enemy_indices.append(i)
-        active_enemies[i].buff_spd()
-        active_enemies[i].reinforce()
+        for k in range(num_of_bullets):
+            if isCollision(active_enemies[i].X, active_enemies[i].Y, projectiles[k].X, projectiles[k].Y):
+                explosionSound = pygame.mixer.Sound("explosion.wav")
+                explosionSound.play()
+                projectiles[k].reset()
+                score_value += 1
+                # Had to put the value in enemies.Enemy so that buff_spd() could reset it, 
+                # but had to reference it here in order to increment it per collision.
+                enemies.Enemy.spd_death_count += 1
+                # Same here
+                enemies.Enemy.rein_death_count += 1
+                destroyed_enemy_indices.append(i)
+            active_enemies[i].buff_spd()
+            active_enemies[i].reinforce()
 
 
 
     # Bullet Movement
-    if bullet.Y <= 0:
-        bullet.reset()
-
-    if bullet.state is bullets.BulletState.FIRE :
-        bullet.update()
+    for k in range(num_of_bullets):
+        if projectiles[k].Y <= 0:
+            projectiles[k].reset()
+        if projectiles[k].state is not bullets.BulletState.READY :
+            projectiles[k].update()
 
     player.update()
     show_score(textX, textY)

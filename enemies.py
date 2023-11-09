@@ -29,7 +29,7 @@ class Enemy():
         self.Y=2000
         # This is the function used to increase the enemy speed
     def buff_spd(self):
-        if Enemy.spd_death_count == 5:
+        if Enemy.spd_death_count == 20:
             # This changes the speed for all new enemies
             Enemy.X_change=Enemy.X_change * 1.05
             # And this changes it for all current enemies
@@ -37,6 +37,6 @@ class Enemy():
                 self.X_change=self.X_change * 1.05
             Enemy.spd_death_count = 0
     def reinforce(self):
-        if Enemy.rein_death_count == 20:
+        if Enemy.rein_death_count == 5:
             Enemy.Enemy_count += 1
             Enemy.rein_death_count = 0
