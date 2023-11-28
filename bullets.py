@@ -1,38 +1,71 @@
 import pygame
 
-class BulletState (enumerate):
-    FIRING = 0
-    COOLDOWN = 1
-    READY = 2
+class BulletState(enumerate):
+        READY = 0    # Ready - You can't see the bullet on the screen
+        FIRE = 1     # Fire - The bullet is currently moving
+        COOLDOWN = 2 # Cooldown - bullet safely reloading
 
-class Bullet():
-    bulletY_change = 10  
-    def __init__(self,screen):
-        self.screen=screen
-        self.Img = pygame.image.load("bullet.png")
-        self.sound = pygame.mixer.Sound("laser.wav")
-        self.Y = 480
+
+class Bullet() :
+
+    speedFactor = 1.0
+
+    def reset(self) :
         self.X = 0
-        self.state=BulletState.READY
-        self.cooldown_track = 0
-    def fire(self,playerX):
-        self.playerX=playerX
-        self.X = playerX
         self.Y = 480
-        self.sound.play()
-        self.state=BulletState.FIRING
-        self.cooldown_track = 100
-    def reset(self):
-        self.Y = 550
-        self.X = 20
+        self.X_change = 0
+        self.Y_change = 10
+        self.cooldownTime = 2000
         self.state = BulletState.COOLDOWN
-    def update(self):
-        if self.state == BulletState.FIRING:
-            pass
-        elif self.cooldown_track == 0:
+
+    def __init__(self,screen) :
+        self.image = pygame.image.load('bullet.png')
+        self.sound = pygame.mixer.Sound("laser.wav")
+        self.reset()
+        self.state = BulletState.READY
+        self.fireTime = 0
+        self.screen = screen
+
+    def resolveCooldown(self):
+        self.currentTime = pygame.time.get_ticks()
+        if self.state == BulletState.READY:
+            return True
+        elif self.state == BulletState.COOLDOWN and (( self.currentTime - self.fireTime) > self.cooldownTime):
             self.state = BulletState.READY
-        elif self.cooldown_track > 0:
-            self.cooldown_track -= 1
-        if self.state == BulletState.FIRING:
-            self.Y-=self.bulletY_change
-            self.screen.blit(self.Img,(self.X+16,self.Y+10))
+            return True
+        else:
+            return False
+
+    def update(self) :
+        self.resolveCooldown()
+        self.screen.blit(self.image, (self.X + 16, self.Y + 10))
+        self.Y = self.Y - self.Y_change
+        self.X = self.X + self.X_change
+
+    def fire(self, X, Y) :
+        if self.resolveCooldown():
+            self.state = BulletState.FIRE
+            self.fireTime = pygame.time.get_ticks()
+            self.sound.play()
+            self.X = X
+            self.Y = Y
+            self.update()
+            return True
+        else:
+            return False
+
+class Bullet_Mk2 (Bullet):
+    def fire (self, X, Y, host_X_change):
+        if self.resolveCooldown():
+            # Couldn't find a way to use super().fire() here,
+            # But I probably could've looked harder
+            self.X_change = host_X_change
+            self.X = X
+            self.Y = Y
+            self.state = BulletState.FIRE
+            self.fireTime = pygame.time.get_ticks()
+            self.sound.play()
+            self.update()
+            return True
+        else:
+            return False
