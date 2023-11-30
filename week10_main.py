@@ -32,6 +32,20 @@ pygameClock = pygame.time.Clock()
 # Player
 player = players.Player(screen)
 
+# Turrets
+# They have to be defined here because if I wait until the score hits 
+# The sufficient count, the game will NameError when it runs into the
+# Code the turrets use.
+active_turrets = []
+for x in range (2):
+    # Something's wrong with the second turret's X location, and I 
+    # Can't figure it out for the life of me
+    active_turrets.append(turrets.Turret (screen, ((x+1)*600/3)))
+
+
+
+
+
 #sensors = sensors.SensorContacts()
 
 # Enemy
@@ -39,22 +53,15 @@ active_enemies = []
 destroyed_enemy_indices = []
 num_of_enemies = 6
 
-# Turrets
-Turret1 = turrets.Turret (screen, 92)
-Turret2 = turrets.Turret (screen, 644)
-
 # Score
 
-score_value = 0
+score_value = 40
 score_font = pygame.font.Font('freesansbold.ttf', 32)
 textX = 10
 textY = 10
 
 # Game Over
 over_font = pygame.font.Font('freesansbold.ttf', 64)
-
-# Game Phase
-phase = 1
 
 def show_score(x, y):
     score = score_font.render("Score : " + str(score_value), True, (255, 255, 255))
@@ -66,17 +73,16 @@ def game_over_text():
     screen.blit(over_text, (200, 250))
 
 
-def isCollision(enemyX, enemyY, bulletX, bulletY):
+def isCollision(enemyX, enemyY, bulletX, bulletY, blast_radius):
     distance = math.sqrt(math.pow(enemyX - bulletX, 2) + (math.pow(enemyY - bulletY, 2)))
-    if distance < 27:
+    if distance < blast_radius:
         return True
     else:
         return False
 
-
 # Game Loop
 running = True
-FPS = 100
+FPS = 50
     
 while running:
     pygameClock.tick(FPS)
@@ -87,7 +93,21 @@ while running:
     destroyed_enemy_indices = []
     
     while (len(active_enemies) < num_of_enemies):
-        active_enemies.append(enemies.Enemy(screen))
+        active_enemies.append(enemies.Enemy_Mk2(screen))
+
+    turret_compound_mag = []
+    for x in range (2):
+        turret_compound_mag.append(active_turrets[x].ammo)
+    enemy_compound_mag = []
+    for i in range (num_of_enemies):
+        if active_enemies[i].klass != 1:
+            enemy_compound_mag.append(active_enemies[i].ammo)
+    non_player_compound_mag = []
+    non_player_compound_mag.append(turret_compound_mag)
+    non_player_compound_mag.append(enemy_compound_mag)
+    universal_compound_mag = []
+    universal_compound_mag.append(player.compound_magazine)
+    universal_compound_mag.append(non_player_compound_mag)
 
     # RGB = Red, Green, Blue
     screen.fill((0, 0, 0))
@@ -129,53 +149,48 @@ while running:
             break
 
         active_enemies[i].update()
-        
-        # Player Mk1 Collision
-        for bullet in player.mk1_magazine:
-            if bullet.state == bullets.BulletState.FIRE:
-                if isCollision(active_enemies[i].X, active_enemies[i].Y, bullet.X, bullet.Y):
-                    explosionSound = pygame.mixer.Sound("explosion.wav")
-                    explosionSound.play()
-                    bullet.reset()
-                    score_value += 1
-                    if (score_value / 5) == int(score_value / 5):
-                        num_of_enemies = num_of_enemies + 1
-                    if (score_value / 20) == int(score_value/ 20):
-                        enemies.Enemy.defaultSpeedFactor = enemies.Enemy.defaultSpeedFactor  * 1.05
-                    destroyed_enemy_indices.append(i)
-                else:
-                    if bullet.Y <= 0:
-                        bullet.reset()
-        # Player Mk2 Collision
-        for bullet in player.mk2_magazine:
-            if bullet.state == bullets.BulletState.FIRE:
-                if isCollision(active_enemies[i].X, active_enemies[i].Y, bullet.X, bullet.Y):
-                    explosionSound = pygame.mixer.Sound("explosion.wav")
-                    explosionSound.play()
-                    bullet.reset()
-                    score_value += 1
-                    if (score_value / 5) == int(score_value / 5):
-                        num_of_enemies = num_of_enemies + 1
-                    if (score_value / 20) == int(score_value/ 20):
-                        enemies.Enemy.defaultSpeedFactor = enemies.Enemy.defaultSpeedFactor  * 1.05
-                    destroyed_enemy_indices.append(i)
-                else:
-                    if bullet.Y <= 0:
-                        bullet.reset()
-
-    # Check to see if phase 2/3 is triggered
-    if score_value >= 50 and phase == 1:
-        Turret1.activate()
-        phase = 2
-    if score_value >= 100 and phase == 2:
-        Turret2.activate()
-        phase = 3
-    if Turret1.state == turrets.TurretState.ACTIVE:
-        Turret1.update()
-        Turret1.fire()
-    if Turret2.state == turrets.TurretState.ACTIVE:
-        Turret2.update()
-        Turret2.fire()
+        for j in range (num_of_enemies):
+            if active_enemies[j].X > active_enemies[i].X + 100 or active_enemies[j].X > active_enemies[i].X - 100\
+                or active_enemies[j].Y < active_enemies[i].Y:
+                active_enemies[i].fire()
+    # This is seperate so that it doesn't try to get dead enemies to fire bullets
+    for i in range (num_of_enemies):
+        for mag_type in universal_compound_mag:
+            for mag in mag_type:
+                for bullet in mag:
+                    if bullet.state == bullets.BulletState.FIRE:
+                        if isCollision(active_enemies[i].X, active_enemies[i].Y, bullet.X, bullet.Y, bullet.blast_radius):
+                            explosionSound = pygame.mixer.Sound("explosion.wav")
+                            explosionSound.play()
+                            score_value += 1
+                            if (score_value / 5) == int(score_value / 5):
+                                num_of_enemies = num_of_enemies + 1
+                            if (score_value / 20) == int(score_value/ 20):
+                                enemies.Enemy.defaultSpeedFactor = enemies.Enemy.defaultSpeedFactor  * 1.05
+                            destroyed_enemy_indices.append(i)
+                            if bullet.detonate_type == bullets.Detonations.INSTANT:
+                                bullet.reset()
+                            elif bullet.detonate_type == bullets.Detonations.DELAYED:
+                                bullet.remove_at_round_end = True
+                        else:
+                            if bullet.Y <= 0:
+                                bullet.reset()
+        # Turret Collision
+    for mag in player.compound_magazine:
+        for bullet in mag:
+            if bullet.remove_at_round_end == True:
+                bullet.reset()
+                bullet.remove_at_round_end = False
+    # Check to see if turrets triggered
+    if score_value >= 50:
+        active_turrets[0].activate()
+    if score_value >= 100:
+        active_turrets[1].activate()
+    for weapon in active_turrets:
+        weapon.update()
+        if player.X < (weapon.X - 100) or player.X > (weapon.X + 100):
+            if weapon.state == turrets.TurretState.ACTIVE:
+                weapon.fire()
     player.update()
     show_score(textX, textY)
-    pygame.display.update()
+    pygame.display.update() 

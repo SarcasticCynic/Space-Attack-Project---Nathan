@@ -19,13 +19,17 @@ class Player():
         self.mk1_magazine = []
         self.state = WeaponState.MK1
         for x in range(5):
-            self.mk1_magazine.append( bullets.Bullet(screen) )
+            self.mk1_magazine.append(bullets.Bullet(screen) )
         self.mk2_magazine = []
         for x in range(5):
-            self.mk2_magazine.append( bullets.Bullet_Mk2(screen))
+            self.mk2_magazine.append(bullets.Bullet_Mk2(screen))
+        self.mk3_magazine = []
+        for x in range (5):
+            self.mk3_magazine.append(bullets.Bullet_Mk3(screen))
         self.compound_magazine = []
         self.compound_magazine.append(self.mk1_magazine)
         self.compound_magazine.append(self.mk2_magazine)
+        self.compound_magazine.append(self.mk3_magazine)
 
     def move_left(self):
         self.X_change = -5
@@ -45,40 +49,25 @@ class Player():
 
         for magazine in self.compound_magazine:
             for bullet in magazine:
-                if bullet.state == bullets.BulletState.FIRE:
+                if bullet.state == bullets.BulletState.FIRE or bullet.state == bullets.BulletState.FIRING:
                     bullet.update()
 
                 elif bullet.state is bullets.BulletState.COOLDOWN :
                     bullet.resolveCooldown()
-#        for bullet in self.mk2_magazine:
-#            if bullet.state == bullets.BulletState.FIRE:
-#                bullet.update()
-#                    
-#            elif bullet.state is bullets.BulletState.COOLDOWN :
-#                bullet.resolveCooldown()
-
         self.screen.blit(self.image, (self.X, self.Y))
 
     def fire(self):
-        for magazine in self.compound_magazine:
-            for bullet in magazine:
-                if self.state == WeaponState.MK1:
-                    try:
-                        bullet.fire(self.X, self.Y)
-                        return
-                    except TypeError:
-                        return
-                if self.state == WeaponState.MK2:
-                    try:
-                        bullet.fire(self.X, self.Y, self.X_change)
-                        return
-                    except TypeError:
-                        return
+        if self.state == WeaponState.MK1:
+            for bullet in self.mk1_magazine:
+                if bullet.fire(self.X, self.Y):
+                    return
+        if self.state == WeaponState.MK2:
+            for bullet in self.mk2_magazine:
+                if bullet.fire(self.X, self.Y, self.X_change):
+                    return
+        if self.state == WeaponState.MK3:
+            for bullet in self.mk3_magazine:
+                if bullet.fire(self.X, self.Y):
+                    return
         # no bullet was READY
         self.emptyMagazineClickSound.play()
-#    def fire_mk2(self):
-#        for bullet in self.mk2_magazine:
-#            if bullet.fire(self.X, self.Y, self.X_change):
-#                return
-#            
-#        self.emptyMagazineClickSound.play()
