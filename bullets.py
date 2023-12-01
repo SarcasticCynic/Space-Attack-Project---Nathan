@@ -20,9 +20,9 @@ class Bullet() :
 
     def reset(self) :
         self.X = 0
-        self.Y = 1000
+        self.Y = 1100
         self.X_change = 0
-        self.Y_change = 0
+        self.Y_change = 10
         self.state = BulletState.COOLDOWN
 
     def __init__(self,screen) :
@@ -31,12 +31,13 @@ class Bullet() :
         self.reset()
         self.state = BulletState.READY
         self.fireTime = 0
-        self.firingTime = 30
+        self.firingTime = 100
         self.screen = screen
         self.blast_radius = 27
         self.detonate_type = Detonations.INSTANT
         self.remove_at_round_end = False
         self.cooldownTime = 2000
+
 
     def resolveCooldown(self):
         self.currentTime = pygame.time.get_ticks()
@@ -63,7 +64,6 @@ class Bullet() :
             self.sound.play()
             self.X = X
             self.Y = Y
-            self.Y_change = 10
             self.update()
             return True
         else:
@@ -77,7 +77,6 @@ class Bullet_Mk2 (Bullet):
             self.X_change = host_X_change
             self.X = X
             self.Y = Y
-            self.Y_change = 10
             self.state = BulletState.FIRING
             self.fireTime = pygame.time.get_ticks()
             self.sound.play()

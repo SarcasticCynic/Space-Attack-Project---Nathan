@@ -82,19 +82,25 @@ def isCollision(enemyX, enemyY, bulletX, bulletY, blast_radius):
 
 # Game Loop
 running = True
-FPS = 50
+FPS = 100
     
 while running:
     pygameClock.tick(FPS)
-    
-    destroyed_enemy_indices.sort(reverse=True)
     for enemy_index in destroyed_enemy_indices :
-        active_enemies.pop(enemy_index)
+        active_enemies.remove(enemy_index)
     destroyed_enemy_indices = []
     
     while (len(active_enemies) < num_of_enemies):
         active_enemies.append(enemies.Enemy_Mk2(screen))
 
+    # We'll use this to get a dest_entity_count later
+    enemy_bullet_count = 0
+    for enemy in active_enemies:
+        if enemy.klass != 1:
+            enemy_bullet_count += 1
+
+
+    # Assembling the list of bullets
     turret_compound_mag = []
     for x in range (2):
         turret_compound_mag.append(active_turrets[x].ammo)
@@ -108,6 +114,26 @@ while running:
     universal_compound_mag = []
     universal_compound_mag.append(player.compound_magazine)
     universal_compound_mag.append(non_player_compound_mag)
+    # These are in case we want to add more types of adversarial entities. 
+    # It also makes the code a lot cleaner in the collision portion. 
+    # Okay so maybe cleaner isn't the right word.
+    enemy_team_entities = []
+    enemy_team_entities.append(active_enemies)
+    # This is for the same
+    player_controlled_units = []
+    player_controlled_units.append(player)
+    player_team_entities = []
+    player_team_entities.append(player_controlled_units)
+    player_team_entities.append(active_turrets)
+    nonbullet_entities = []
+    nonbullet_entities.append(enemy_team_entities)
+    nonbullet_entities.append(player_team_entities)
+    destructible_entities = []
+    destructible_entities.append(nonbullet_entities)
+    destructible_entities.append(universal_compound_mag)
+
+    # The math here: 16: 5 bullets * 3 magazines + 1 player. 4: 2 turrets + 2 bullets
+    dest_entity_count = num_of_enemies + 16 + enemy_bullet_count + 4
 
     # RGB = Red, Green, Blue
     screen.fill((0, 0, 0))
@@ -154,8 +180,45 @@ while running:
                 or active_enemies[j].Y < active_enemies[i].Y:
                 active_enemies[i].fire()
     # This is seperate so that it doesn't try to get dead enemies to fire bullets
-    for i in range (num_of_enemies):
-        for mag_type in universal_compound_mag:
+    for category in destructible_entities:
+        for type in category:
+            for subtype in type:
+                for item in subtype:
+                        for mag_type in universal_compound_mag:
+                            for mag in mag_type:
+                                for bullet in mag:
+                                    if bullet.state == bullets.BulletState.FIRE:
+                                        if isCollision(item.X, item.Y, bullet.X, bullet.Y, bullet.blast_radius):
+                                            if item is not bullet:
+                                                explosionSound = pygame.mixer.Sound("explosion.wav")
+                                                explosionSound.play()
+                                                if item is player:
+                                                    for x in range(num_of_enemies):
+                                                        active_enemies[x].clear()
+                                                    game_over_text()
+                                                    break
+                                                if isinstance (item, enemies.Enemy):
+                                                    score_value += 1
+                                                    if (score_value / 5) == int(score_value / 5):
+                                                        num_of_enemies = num_of_enemies + 1
+                                                    if (score_value / 20) == int(score_value/ 20):
+                                                        enemies.Enemy.defaultSpeedFactor = enemies.Enemy.defaultSpeedFactor  * 1.05
+                                                    destroyed_enemy_indices.append(item)
+                                                if isinstance (item, bullets.Bullet):
+                                                    item.reset()
+                                                    bullet.reset()
+                                                if bullet.detonate_type == bullets.Detonations.INSTANT:
+                                                    bullet.reset()
+                                                elif bullet.detonate_type == bullets.Detonations.DELAYED:
+                                                    bullet.remove_at_round_end = True
+                                        else:
+                                            if bullet.Y <= 0:
+                                                bullet.reset()
+        
+
+
+
+        '''for mag_type in universal_compound_mag:
             for mag in mag_type:
                 for bullet in mag:
                     if bullet.state == bullets.BulletState.FIRE:
@@ -174,7 +237,7 @@ while running:
                                 bullet.remove_at_round_end = True
                         else:
                             if bullet.Y <= 0:
-                                bullet.reset()
+                                bullet.reset()'''
         # Turret Collision
     for mag in player.compound_magazine:
         for bullet in mag:
