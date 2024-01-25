@@ -1,17 +1,11 @@
 import pygame
+import enum
+import sensors
 
-class BulletState(enumerate):
+class BulletState(enum.Enum):
         READY = 0    # Ready - You can't see the bullet on the screen
         FIRE = 1     # Fire - The bullet is currently moving
         COOLDOWN = 2 # Cooldown - bullet safely reloading
-        FIRING = 3
-        DETONATED = 4
-
-class Detonations (enumerate):
-    INSTANT = 0
-    DELAYED = 1
-    # Not using this one atm but it'll be useful when creating a piercing bullet.
-    NEVER = 2
 
 
 class Bullet() :
@@ -19,78 +13,110 @@ class Bullet() :
     speedFactor = 1.0
 
     def reset(self) :
-        self.X = 0
-        self.Y = 1100
-        self.X_change = 0
-        self.Y_change = 10
+        self.X = self.resetX
+        self.Y = self.resetY
+        self.X_change = self.resetX_change
+        self.Y_change = self.resetY_change
+        self.cooldownTime = self.resetCoolDownTime
         self.state = BulletState.COOLDOWN
+        self.detectRadius = 27
+        self.detonationRange = 27
+        self.blastRadius = 27
 
-    def __init__(self,screen) :
+    def __init__(self, screen, X=0, Y=480, X_change=0, Y_change=-10, cooldownTime=2000) :
         self.image = pygame.image.load('bullet.png')
         self.sound = pygame.mixer.Sound("laser.wav")
+        self.sensors = sensors.SensorArray()
+
+        self.resetX = X
+        self.resetY = Y
+        self.resetX_change = X_change
+        self.resetY_change = Y_change
+        self.resetCoolDownTime = cooldownTime
         self.reset()
+
         self.state = BulletState.READY
         self.fireTime = 0
-        self.firingTime = 100
         self.screen = screen
-        self.blast_radius = 27
-        self.detonate_type = Detonations.INSTANT
-        self.remove_at_round_end = False
-        self.cooldownTime = 2000
 
+        self.bulletattr = {}
+        self.bulletattr["flags"] = ["isdestructable", "ismobile",]
+        self.bulletattr["unittype"] = ["teamnone", "typebullet"]
 
     def resolveCooldown(self):
-        self.currentTime = pygame.time.get_ticks()
-        if self.state == BulletState.FIRING and (( self.currentTime - self.fireTime) > self.firingTime):
-            self.state = BulletState.FIRE
         if self.state == BulletState.READY:
             return True
-        elif self.state == BulletState.COOLDOWN and (( self.currentTime - self.fireTime) > self.cooldownTime):
-            self.state = BulletState.READY
+        elif self.state == BulletState.COOLDOWN:
+            currentTime = pygame.time.get_ticks()
+            if (currentTime - self.fireTime) > self.cooldownTime:
+                self.state = BulletState.READY
+                self.remainingCooldownTime = 0
+            else:
+                self.remainingCooldownTime = self.cooldownTime - (currentTime - self.fireTime)
+                return False
+
             return True
         else:
             return False
 
     def update(self) :
         self.resolveCooldown()
-        self.screen.blit(self.image, (self.X + 16, self.Y + 10))
-        self.Y = self.Y - self.Y_change
-        self.X = self.X + self.X_change
+        rotated_image = self.image
+        if self.Y_change > 0:
+            pygame.transform.rotate(self.image, 90)
+            rotate_rect = self.image.get_rect().copy()
+            rotate_rect.center = rotated_image.get_rect().center
+            rotated_image = rotated_image.subsurface(rotate_rect).copy()
+        self.screen.blit(rotated_image, (self.X + 16, self.Y + self.Y_change))
+        self.Y += self.Y_change
+        self.X += self.X_change
 
-    def fire(self, X, Y) :
+    def fire(self, x, y, inertia=0) :
         if self.resolveCooldown():
-            self.state = BulletState.FIRING
+            self.state = BulletState.FIRE
             self.fireTime = pygame.time.get_ticks()
             self.sound.play()
-            self.X = X
-            self.Y = Y
+            self.X = x
+            self.Y = y + ((self.Y_change / abs(self.Y_change)) * max(self.detonationRange, self.blastRadius) + 1)
+
             self.update()
             return True
         else:
             return False
 
-class Bullet_Mk2 (Bullet):
-    def fire (self, X, Y, host_X_change):
-        if self.resolveCooldown():
-            # Couldn't find a way to use super().fire() here,
-            # But I probably could've looked harder
-            self.X_change = host_X_change
-            self.X = X
-            self.Y = Y
-            self.state = BulletState.FIRING
-            self.fireTime = pygame.time.get_ticks()
-            self.sound.play()
-            self.update()
-            return True
-        else:
-            return False
+class Bullet_mk2(Bullet) :
 
-class Bullet_Mk3 (Bullet):
-    def __init__ (self, screen):
-        super().__init__(screen)
-        self.image = pygame.image.load('bullet_mk3.png')
-        self.blast_radius = 40
-        self.firingTime = 50
-        self.detonate_type = Detonations.DELAYED
-        self.remove_at_round_end = False
-        self.cooldownTime = 3000
+    def fire(self, x, y, inertia):
+        self.X_change = inertia
+        return super().fire(x, y, inertia)
+
+class Bullet_mk3(Bullet) :
+    
+    def reset(self) :
+        super().reset()
+        self.blastRadius = 40
+
+class Blast() :
+
+    def __init__(self,screen,x,y,radius,color=(255,0,0),linger=100) :
+        self.screen = screen
+        self.color = color
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.linger = linger
+        self.redStep   = self.color[0] / self.linger
+        self.blueStep  = self.color[1] / self.linger
+        self.greenStep = self.color[2] / self.linger
+
+    def update(self) :
+        if self.linger > 0 :
+            pygame.draw.circle(self.screen, self.color, (self.x, self.y), self.radius)
+            red = self.color[0] - self.redStep
+            blue = self.color[1] - self.blueStep
+            green = self.color[2] - self.greenStep
+            self.color = (red, green, blue)
+            self.linger -= 1
+            return True
+        else :
+            return False
